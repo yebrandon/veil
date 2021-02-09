@@ -16,6 +16,7 @@ def process_imgs():
     """
     remove_files(DEST_DIR)
 
+    print("Processing image...")
     img = face_recognition.load_image_file("capture.png")
     face_locations = face_recognition.face_locations(
         img, 1, "cnn"

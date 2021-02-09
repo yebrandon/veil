@@ -152,3 +152,4 @@ node_modules
 # Application files
 capture.png
 results.json
+detected_faces/

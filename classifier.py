@@ -60,6 +60,8 @@ def classify_imgs():
     )
     args = parser.parse_args()
 
+    print("Classifying faces...")
+
     results = {}
     IMGS_DIR = os.listdir(args.tests)
 

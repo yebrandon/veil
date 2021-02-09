@@ -37,7 +37,6 @@ class App extends Component {
 	detectMasks() {
 		let capture = this.refs.webcam.getScreenshot();
 		this.setState({ capture: capture }, () => {
-			console.log(this.state.capture);
 			this.analyzeImg(this.state.capture);
 		});
 	}
