@@ -1,2 +1,2 @@
-FaceTrainingSet
-MaskTrainingSet
+no_mask_training_set
+mask_training_set

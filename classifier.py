@@ -12,70 +12,58 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""label_image for tflite."""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import argparse
-import time
 import os
-
+import json
+import sys
+import PIL
 import numpy as np
-from PIL import Image
-import tensorflow as tf  # TF2
-from tensorflow import keras
+import tensorflow as tf
 
-def assignLabelToImage (dictionaryOfValuesandLabels):
-  highestPercentage = 0
-  highestLabel = ""
-  for key in dictionaryOfValuesandLabels:
-    if dictionaryOfValuesandLabels[key] > highestPercentage:
-      highestPercentage = dictionaryOfValuesandLabels[key]
-      highestLabel= key
-  return highestLabel,highestPercentage*100
-  
-def load_labels(filename):
-    with open(filename, "r") as f:
+
+def load_labels(file_name):
+    with open(file_name, "r") as f:
         return [line.strip() for line in f.readlines()]
 
 
-def classifyImages():
+def classify_imgs():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "-t", "--tests", default="tests", help="folder of test images to be classified"
+        "-t",
+        "--tests",
+        default="detected_faces",
+        help="folder of test imgs to be classified",
     )
     parser.add_argument(
         "-m",
         "--model_file",
-        default="/tmp/mobilenet_v1_1.0_224_quant.tflite",
+        default="new_mobile_model.tflite",
         help=".tflite model to be executed",
     )
     parser.add_argument(
         "-l",
         "--label_file",
-        default="/tmp/labels.txt",
+        default="class_labels.txt",
         help="name of file containing labels",
     )
-    parser.add_argument("--input_mean", default=127.5, type=float, help="input_mean")
+    parser.add_argument("--input_mean", default=0.0, type=float, help="input_mean")
     parser.add_argument(
-        "--input_std", default=127.5, type=float, help="input standard deviation"
+        "--input_std", default=255.0, type=float, help="input standard deviation"
     )
     parser.add_argument(
         "--num_threads", default=None, type=int, help="number of threads"
     )
     args = parser.parse_args()
 
-    list = os.listdir(args.tests)  
-    num_files = len(list)
+    results = {}
+    IMGS_DIR = os.listdir(args.tests)
 
-    for i in list:
-      if(i == ".DS_Store"):
-        list.remove(i)
-
-    listOfAllClassifiedImages = {}
-    for file in list:
+    for file in IMGS_DIR:
 
         interpreter = tf.lite.Interpreter(
             model_path=args.model_file, num_threads=args.num_threads
@@ -91,10 +79,9 @@ def classifyImages():
         # NxHxWxC, H:1, W:2
         height = input_details[0]["shape"][1]
         width = input_details[0]["shape"][2]
-        img = Image.open(str(args.tests) + "/" + str(file)).resize((width, height))
+        img = PIL.Image.open(str(args.tests) + "/" + str(file)).resize((width, height))
 
         # add N dim
-        
         input_data = np.expand_dims(img, axis=0)
 
         if floating_model:
@@ -102,28 +89,30 @@ def classifyImages():
 
         interpreter.set_tensor(input_details[0]["index"], input_data)
 
-        start_time = time.time()
         interpreter.invoke()
-        stop_time = time.time()
 
         output_data = interpreter.get_tensor(output_details[0]["index"])
-        results = np.squeeze(output_data)
+        confidences = np.squeeze(output_data)
 
-        top_k = results.argsort()[-5:][::-1]
         labels = load_labels(args.label_file)
-        labelsAndPercentages = {}
-        for i in top_k:
-            if floating_model:
-                labelsAndPercentages[labels[i]] = results[i]
-            else:
-                print("one of the results of top_k was not a floating_model")
-                sys.exit(1)
-        
+        confidences = list(confidences)
 
-        listOfAllClassifiedImages[file]=assignLabelToImage(labelsAndPercentages)
-    return listOfAllClassifiedImages
+        if floating_model:
+            outcome_confidence = float(max(confidences))
+            detection_outcome = {
+                "match": labels[confidences.index(outcome_confidence)],
+                "confidence": outcome_confidence,
+            }
+
+            results[file] = detection_outcome
+        else:
+            print("one of the confidences was not a floating_model")
+            sys.exit(1)
+
+    return results
 
 
-fileToBeWritten = open("dictionaryOfResults.txt", "w")
-fileToBeWritten.write(str(classifyImages()))
-fileToBeWritten.close()
+def write_img_labels():
+    DEST_FILE = "results.json"
+    with open(DEST_FILE, "w") as outfile:
+        json.dump(classify_imgs(), outfile)

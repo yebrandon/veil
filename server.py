@@ -1,81 +1,58 @@
-from flask import Flask
-from flask import jsonify, request
-from flask_cors import CORS
-from PIL import Image
-from io import BytesIO
-import numpy
+import flask
+import flask_cors
 import base64
 import os
-import time
 
-import sys
+import img_processor
+import classifier
 
-import file_to_call_script
-
-app = Flask(__name__)
-CORS(app)
-
-def listToDict(lst):
-    arr = []
-    for i in range(0, len(lst), 3):
-         res_dct = {"file_name":lst[i], "label":lst[i + 1], "confidence":lst[i + 2]}
-         arr.append(res_dct)
-    result = {"data":arr}
-    return(result)
-
-def txtToJson(file_name):
-    with open(file_name) as fh: 
-        for line in fh: 
-            line = line.replace("{", "")
-            line = line.replace("}", "")
-            line = line.replace("'", "")
-            line = line.replace(":", "")
-            line = line.replace("(", "")
-            line = line.replace(")", "")
-            line = line.replace(",", "")
-            result = listToDict(line.split())
-            return result
-
-def base64toImg(base64_string):
-    base64_string = base64_string.replace(base64_string[:22], '', 1) 
-    imgdata = base64.b64decode(base64_string)
-    filename = 'screenshot.png'
-    with open(filename, 'wb') as f:
-        f.write(imgdata)
+app = flask.Flask(__name__)
+flask_cors.CORS(app)
 
 
-@app.route('/')
+def save_img(b64_str):
+    """
+    Saves image as file capture.png
+    :param b64_str: base64 encoded string representation of image data
+    """
+    parsed_b64_str = b64_str.replace(b64_str[:22], "", 1)  # remove data tags
+    img_data = base64.b64decode(parsed_b64_str)
+    with open("capture.png", "wb") as img_file:
+        img_file.write(img_data)
+
+
+@app.route("/")
 def home():
-    return ('hello!')
-
-# Sends array of base64 strings from images in tests
-@app.route('/getImgs')
-def getImgs():
-    arr = []
-    directory = "./tests"
-    time.sleep(3)
-    for filename in os.listdir(directory):
-        filename = "./tests/" + filename
-        with open(filename, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read())
-            encoded_string = encoded_string.decode('utf-8')
-            arr.append(encoded_string)
-            print(encoded_string, file=sys.stderr)
-    result = {"data":arr}
-    #print(result, file=sys.stderr)
-    return (result)
-
-# Takes in base64 string, runs bash script, and returns results
-@app.route('/saveImg', methods=['POST']) #GET requests will be blocked
-def saveImg():
-    req_data = request.get_json()
-    base64str = req_data['base64str']
-    base64toImg(base64str)
-    #print('aaaatput', file=sys.stdout)
-    file_to_call_script.callBashScript()
-    #print('Tbbbbb output', file=sys.stdout)
-    return txtToJson('dictionaryOfResults.txt')
+    return "Flask API is running!"
 
 
-if __name__ == '__main__':
+@app.route("/get-imgs")
+def get_imgs():
+    """
+    Retrieves images in image directory
+    :return JSON object with an entry for each image with its filename and base64 encoded string representation
+    """
+    results = {}
+    for filename in os.listdir("./detected_faces"):
+        with open("./detected_faces/" + filename, "rb") as image_file:
+            encoded_bytes = base64.b64encode(image_file.read())
+            encoded_str = encoded_bytes.decode("utf-8")
+            results[filename] = encoded_str
+    return flask.jsonify(results)
+
+
+@app.route("/analyze-capture", methods=["POST"])
+def analyze_capture():
+    """
+    Executes facial recognition processing and ML classification on image
+    return: JSON object with an entry for each image with its filename, detection result, and confidence level
+    """
+    req_data = flask.request.get_json()
+    save_img(req_data["b64Str"])
+    img_processor.process_imgs()
+    classifier.write_img_labels()
+    return flask.send_file("results.json", mimetype="application/json")
+
+
+if __name__ == "__main__":
     app.run(port=8000)

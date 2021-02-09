@@ -1,38 +1,46 @@
-.App {
-  text-align: center;
+@import url('https://fonts.googleapis.com/css2?family=Montserrat&display=swap');
+body {
+	background-color: #e2ebfb;
+}
+#webcam,
+#capture {
+	width: 50%;
+	height: auto;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+#banner {
+	width: 100%;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+#capture-btn {
+	width: 100%;
+	padding: 2%;
+	display: block;
+	font-size: 32px;
+	border: none;
+	cursor: pointer;
+	text-align: center;
+	background-color: #363f4e;
+	color: #e2ebfb;
+	font-family: Montserrat;
+	font-weight: bold;
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+.result {
+	height: 20%;
+	width: 20%;
+	float: left;
+	justify-content: center;
+	text-align: center;
 }
 
-.App-link {
-  color: #61dafb;
+#container {
+	float: left;
+	background-color: #e2ebfb;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+#face {
+	padding: 10%;
+	height: 80%;
+	width: 80%;
 }

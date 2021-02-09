@@ -1,92 +1,104 @@
-import "./App.css";
-import React from "react";
-import { Component } from "react";
-import Webcam from "react-webcam";
-import styles from '../src/stylesheet.css'; 
+import React, { Component } from 'react';
+import Webcam from 'react-webcam';
+import banner from './assets/img/veil.png';
+import './App.css';
 
-export default class ImageCapture extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { screenshot: null, labels: null, faces: null };
-  }
+class App extends Component {
+	constructor(props) {
+		super(props);
+		this.state = { capture: null, labels: null, faces: null };
+	}
 
-  saveImg(image) {
-    // POST request to /saveImg to get the labels from the screenshot
-    const requestOptions = {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({"base64str":image}),
-    };
-    fetch("http://localhost:8000/saveImg", requestOptions)
-      .then((response) => response.json())
-      .then((json) => {
-        this.setState({ labels: json.data });
-      });
+	// Retrieve face images and classification labels using capture
+	analyzeImg(img) {
+		const postOptions = {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ b64Str: img })
+		};
+		const getOptions = {
+			method: 'GET',
+			headers: { 'Content-Type': 'application/json' }
+		};
 
-    setTimeout(() => {
+		fetch('http://localhost:8000/analyze-capture', postOptions)
+			.then((response) => response.json())
+			.then((labelData) => {
+				this.setState({ labels: labelData });
+				fetch('http://localhost:8000/get-imgs', getOptions)
+					.then((response) => response.json())
+					.then((facesData) => {
+						this.setState({ faces: facesData });
+					});
+			});
+	}
 
-    // GET request to /getImgs to get the faces
-    const requestOptions2 = {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
-    };
-    fetch("http://localhost:8000/getImgs", requestOptions2)
-      .then((response) => response.json())
-      .then((json) => {
-        this.setState({ faces: json.data });
-      });
+	// Capture webcam frame and start mask detection
+	detectMasks() {
+		let capture = this.refs.webcam.getScreenshot();
+		this.setState({ capture: capture }, () => {
+			console.log(this.state.capture);
+			this.analyzeImg(this.state.capture);
+		});
+	}
 
-    }, 3000);
-  }
+	// Display detected faces and classifications
+	showResults() {
+		if (this.state.faces && this.state.labels) {
+			let results = [];
 
-  screenshot() {
-    // access the webcam trough this.refs
-    var screenshot = this.refs.webcam.getScreenshot();
-    console.log(screenshot);
-    this.setState({ screenshot: screenshot });
-    this.saveImg(screenshot);
-  }
+			for (let [key, val] of Object.entries(this.state.labels)) {
+				let labelStr = '';
+				let confidenceStr =
+					'Confidence: ' +
+					(val.confidence * 100).toString().substring(0, 6) +
+					'%'; // Parse confidence to readable percentage
 
-  showFaces() {
-    
-    console.log(this.state.faces)
-    console.log(this.state.labels)
+				if (val.match === 'no_mask_training_set') {
+					labelStr = 'No Mask Detected';
+				} else {
+					labelStr = 'Mask Detected';
+				}
+				results.push(
+					<div className='result'>
+						<img
+							id='face'
+							src={
+								'data:image/jpg;base64,' + this.state.faces[key]
+							}
+						/>
+						{labelStr}
+						<br />
+						{confidenceStr}
+					</div>
+				);
+			}
 
-    if(this.state.faces != null && this.state.labels != null)
-    {
-      let elements = []
-    for (var i = 0; i < (this.state.labels).length; i++) {
-      
-      console.log(i)
-      let labelStr = "";
+			return results;
+		}
+	}
 
-      if (this.state.labels[i].label == "FaceTrainingSet") {
-        labelStr = "No Mask ";
-      } else {
-        labelStr = "Mask ";
-      }
-      elements.push(
-        <div className="result">
-          <img id="face" src={"data:image/jpg;base64," + this.state.faces[i]} />
-          {labelStr}
-          {"Confidence: " + this.state.labels[i].confidence.substring(0,6)+"%"}
-        </div>)
-      
-    }
-    return elements
-  }
-  }
-
-  render() {
-    return (
-      <div id="container">
-        <img id="banner" src="/veil.png" />
-        <Webcam id="webcam" screenshotFormat={"image/png"} audio={false} ref="webcam" />
-        {this.state.screenshot ? <img id="screenshot" src={this.state.screenshot}/> : null}
-        <button id="screenshotBtn" onClick={this.screenshot.bind(this)}>Detect Masks</button>
-        {this.state.labels && this.state.faces ? this.showFaces() : null}
-        
-      </div>
-    );
-  }
+	render() {
+		return (
+			<div id='container'>
+				<img id='banner' src={banner} />
+				<Webcam
+					id='webcam'
+					screenshotFormat={'image/png'}
+					ref='webcam'
+				/>
+				{this.state.capture ? (
+					<img id='capture' src={this.state.capture} />
+				) : null}
+				<button id='capture-btn' onClick={this.detectMasks.bind(this)}>
+					Detect Masks
+				</button>
+				{this.state.labels && this.state.faces
+					? this.showResults()
+					: null}
+			</div>
+		);
+	}
 }
+
+export default App;
